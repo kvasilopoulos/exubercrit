@@ -25,7 +25,8 @@ proxy: lag 0–4, n 6–5000.
 | 1–4 | any       | not simulated                       |
 
 Anything not covered makes `radf()` (without a user-supplied `cv`) error
-with "haven't been simulated yet".
+with "haven't been simulated yet". `n = 6` with `lag >= 1` is degenerate
+(`radf_mc_cv()` itself errors) and is skipped, so lagged tables start at n = 7.
 
 ## Workflow
 

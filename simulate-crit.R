@@ -46,6 +46,7 @@ run_one <- function(n, lag, nrep, ncores) {
 
 OUT_DIR <- Sys.getenv("EXUBER_CRIT_DIR", "out")
 NREP <- 2000L
+SERIAL_MAX_N <- 300L  # n=300 serial is ~2 min; parallel+subprocess overhead only wins past that
 LOG <- "simulate-crit.log"
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -132,9 +133,16 @@ for (item in todo) {
           n, lag, n_done_session + 1L, n_total, fmt_hms(eta_this), fmt_hms(timeout_this))
   t0 <- Sys.time()
 
+  # Below SERIAL_MAX_N the subprocess + worker-pool startup (~1 min) dwarfs
+  # the simulation itself (seconds), so run those inline and serially.
   cv <- tryCatch(
-    callr::r(run_one, args = list(n = n, lag = lag, nrep = NREP, ncores = ncores),
-             timeout = timeout_this),
+    if (n < SERIAL_MAX_N) {
+      withr::with_options(list(exuber.parallel = FALSE),
+        radf_mc_cv(n, nrep = NREP, seed = 123L, lag = lag))
+    } else {
+      callr::r(run_one, args = list(n = n, lag = lag, nrep = NREP, ncores = ncores),
+               timeout = timeout_this)
+    },
     error = function(e) { log_msg("SIM FAILED/TIMEOUT n=%d lag=%d: %s", n, lag, conditionMessage(e)); NULL }
   )
   if (is.null(cv)) next
