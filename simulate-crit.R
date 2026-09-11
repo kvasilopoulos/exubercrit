@@ -46,6 +46,12 @@ run_one <- function(n, lag, nrep, ncores) {
 
 OUT_DIR <- Sys.getenv("EXUBER_CRIT_DIR", "out")
 NREP <- 2000L
+# Flush each finished table straight to the bucket when credentials are in
+# the environment (eval "$(railway bucket credentials -b exuber-storage)");
+# without them this stays purely local and upload-crit.R does it later.
+UPLOAD <- nzchar(Sys.getenv("AWS_ACCESS_KEY_ID"))
+BUCKET <- Sys.getenv("EXUBER_BUCKET_NAME", Sys.getenv("AWS_S3_BUCKET_NAME", "critical-values-kwz4n3ykp"))
+ENDPOINT <- Sys.getenv("EXUBER_BUCKET_ENDPOINT", Sys.getenv("AWS_ENDPOINT_URL", "https://t3.storageapi.dev"))
 SERIAL_MAX_N <- 300L  # n=300 serial is ~2 min; parallel+subprocess overhead only wins past that
 LOG <- "simulate-crit.log"
 
@@ -149,14 +155,20 @@ for (item in todo) {
 
   write_crit_bin_xz(cv, lag, out_path)
   size_kb <- file.info(out_path)$size / 1024
+  if (UPLOAD) {
+    key <- sprintf("s3://%s/crit/lag%d/n%d.bin.xz", BUCKET, lag, n)
+    st <- system2("aws", c("s3", "cp", out_path, key, "--endpoint-url", ENDPOINT, "--region", "auto"),
+                  stdout = FALSE, stderr = FALSE)
+    if (st != 0L) log_msg("UPLOAD FAILED n=%d lag=%d (kept locally; upload-crit.R will sync it)", n, lag)
+  }
 
   elapsed <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
   n_done_session <- n_done_session + 1L
   session_elapsed <- as.numeric(difftime(Sys.time(), session_start, units = "secs"))
   avg_pace <- session_elapsed / n_done_session
   remaining <- n_total - n_done_session
-  log_msg("saved n=%d lag=%d (%.1fs, %.1f KB) -- %d/%d done, ~%s left in queue",
-          n, lag, elapsed, size_kb, n_done_session, n_total,
+  log_msg("%s n=%d lag=%d (%.1fs, %.1f KB) -- %d/%d done, ~%s left in queue",
+          if (UPLOAD) "saved+uploaded" else "saved", n, lag, elapsed, size_kb, n_done_session, n_total,
           fmt_hms(avg_pace * remaining))
 }
 
