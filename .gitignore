@@ -1,6 +1,5 @@
 .Rhistory
 .RData
-radf_crit*.rds
-radf_crit*.json
-radf_crit*.pkl.xz
-exuberdata/
+simulate-crit.log
+simulate-crit.out
+*.part
