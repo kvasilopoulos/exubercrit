@@ -51,7 +51,7 @@ app.get("/crit/:lang", async (c) => {
 });
 
 // Per-(n, lag) extended table -- one small object per combination, see
-// simulate-crit.R + upload-crit.R in this directory. Still read-only and
+// scripts/simulate-crit.R. Still read-only and
 // bounds-checked: this can only ever address keys under crit/lag*/n*.bin.xz.
 const N_MIN = 6;
 const N_MAX = 5000;

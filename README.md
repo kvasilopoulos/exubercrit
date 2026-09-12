@@ -9,12 +9,10 @@ them, and the proxy that serves them — so both bindings and the website
 consume the same numbers instead of each bundling their own.
 
 ```
-lag<L>/n<N>.bin.xz   one table per (lag, n): lag 0–4, n from n_min(lag) to 4000
-common.R             binary writer + bucket sync helper shared by the scripts
-simulate-crit.R      generates every table for a lag from one Monte Carlo run; syncs the lag when done
-upload-crit.R        catch-up: sync every lag<L>/ to the bucket
-exuber-fn.ts         Railway function "exuber-fn": read-only proxy, GET /crit2/<lag>/<n>
-runs/                logs of the generation runs
+data/lag<L>/n<N>.bin.xz   one table per (lag, n): lag 0–4, n from n_min(lag) to 4000
+scripts/simulate-crit.R   generates every table for a lag from one Monte Carlo run; syncs the lag when done
+scripts/common.R          binary writer + bucket sync helper, sourced by simulate-crit.R
+scripts/exuber-fn.ts      Railway function "exuber-fn": read-only proxy, GET /crit2/<lag>/<n>
 ```
 
 ## Coverage
@@ -27,12 +25,11 @@ runs/                logs of the generation runs
 | 3   | 11–4000   | 3990   |
 | 4   | 15–4000   | 3986   |
 
-All generated 2026-09-12 (`runs/2026-09-12.log`): 2000 replications, seed
-123, PSY minimum window `psy_minw(n) = floor(0.01 n + 1.8 sqrt(n))`,
+All generated 2026-09-12: 2000 replications, seed 123, PSY minimum window `psy_minw(n) = floor(0.01 n + 1.8 sqrt(n))`,
 exubercore v0.2.0. n_min(lag) is the smallest n whose first window keeps a
 residual degree of freedom and that has at least two windows; below it
 `radf_mc_cv()` itself fails. The proxy accepts n up to 5000, so
-`Rscript simulate-crit.R 0:4 5000` extends the grid if ever needed.
+`Rscript scripts/simulate-crit.R 0:4 5000` extends the grid if ever needed.
 
 ## How the numbers are produced
 
@@ -106,13 +103,20 @@ Clients cache each table on disk after first use
 
 ```sh
 eval "$(railway bucket credentials -b exuber-storage)"   # optional: flush each lag to the bucket as it lands
-Rscript simulate-crit.R 0:4 4000        # lags, N, [nrep=2000], [ncores]; skips lags already complete
-Rscript upload-crit.R                   # only if a sync failed above
-railway functions push -p exuber-fn.ts  # only if exuber-fn.ts changed
+Rscript scripts/simulate-crit.R 0:4 4000        # lags, N, [nrep=2000], [ncores]; skips lags already complete
+railway functions push -p scripts/exuber-fn.ts  # only if exuber-fn.ts changed
 curl -sI https://exuber.up.railway.app/crit2/1/100 | head -1
 ```
 
-`simulate-crit.R` needs the `exuber` dev tree next door (`../exuber`) for
+If a lag's sync failed (logged as `UPLOAD FAILED`), push it by hand with the
+same credentials in the environment:
+
+```sh
+aws s3 sync data/lag1 s3://critical-values-kwz4n3ykp/crit/lag1/ --endpoint-url https://t3.storageapi.dev --region auto
+```
+
+`simulate-crit.R` needs the `exuber` dev tree next door (`../exuber`, resolved
+relative to the script) for
 `rls_nested()`, and that tree's DLL built optimised —
 `pkgbuild::compile_dll(debug = FALSE)`; `devtools::load_all()` alone
 builds it with `-O0`, roughly 8× slower.

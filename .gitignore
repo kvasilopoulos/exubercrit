@@ -3,3 +3,4 @@
 simulate-crit.log
 simulate-crit.out
 *.part
+.runs

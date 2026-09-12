@@ -1,6 +1,6 @@
 # Simulates Monte Carlo critical values for every sample size n up to N, for
 # each requested lag, and writes one small file per (lag, n) to OUT_DIR
-# (lag<L>/n<N>.bin.xz -- layout in common.R).
+# (data/lag<L>/n<N>.bin.xz -- layout in common.R).
 #
 # How it's fast: exubercore::radf_nested() (exuber:::rls_nested) returns the
 # statistics for *every* n in [n_min, N] from a single O(N^2) sweep of one
@@ -23,19 +23,20 @@
 # credentials are in the environment -- see common.R), so each lag lands
 # as soon as it's done. Re-running skips lags whose files all exist.
 #
-#   Rscript simulate-crit.R [lags] [N] [nrep] [ncores]
-#   Rscript simulate-crit.R 0:4 4000        # default
-#   Rscript simulate-crit.R 1 600 2000 8
+#   Rscript scripts/simulate-crit.R [lags] [N] [nrep] [ncores]
+#   Rscript scripts/simulate-crit.R 0:4 4000        # default
+#   Rscript scripts/simulate-crit.R 1 600 2000 8
 
-source("common.R")
+SCRIPT_DIR <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(), value = TRUE)[1])))
+source(file.path(SCRIPT_DIR, "common.R"))
 args <- commandArgs(trailingOnly = TRUE)
 LAGS   <- if (length(args) >= 1) eval(parse(text = args[1])) else 0:4
 N      <- if (length(args) >= 2) as.integer(args[2]) else 4000L
 NREP   <- if (length(args) >= 3) as.integer(args[3]) else 2000L
 NCORES <- if (length(args) >= 4) as.integer(args[4]) else max(1L, parallel::detectCores() - 2L)
 SEED   <- 123L
-PKG    <- normalizePath("../exuber")  # dev tree: rls_nested() isn't on CRAN yet
-LOG    <- "simulate-crit.log"
+PKG    <- normalizePath(file.path(SCRIPT_DIR, "..", "..", "exuber"))  # dev tree: rls_nested() isn't on CRAN yet
+LOG    <- file.path(SCRIPT_DIR, "..", ".runs", "simulate-crit.log")
 PCNT   <- c(0.9, 0.95, 0.99)
 
 log_msg <- function(fmt, ...) {
@@ -116,7 +117,7 @@ for (lag in LAGS) {
 
   if (UPLOAD) {
     ok <- sync_to_bucket(lag_dir, sprintf("crit/lag%d", lag))
-    log_msg("lag %d: %s", lag, if (ok) "synced to bucket" else "UPLOAD FAILED (kept locally; run upload-crit.R)")
+    log_msg("lag %d: %s", lag, if (ok) "synced to bucket" else "UPLOAD FAILED (kept locally; sync by hand, see README)")
   }
 }
 log_msg("=== finished ===")

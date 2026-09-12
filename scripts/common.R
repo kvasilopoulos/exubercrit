@@ -1,6 +1,7 @@
-# Shared by simulate-crit.R and upload-crit.R.
+# Sourced by simulate-crit.R, which defines SCRIPT_DIR (this directory) so
+# paths resolve regardless of the working directory.
 
-OUT_DIR <- Sys.getenv("EXUBER_CRIT_DIR", ".")
+OUT_DIR <- Sys.getenv("EXUBER_CRIT_DIR", file.path(SCRIPT_DIR, "..", "data"))
 BUCKET <- Sys.getenv("EXUBER_BUCKET_NAME", Sys.getenv("AWS_S3_BUCKET_NAME", "critical-values-kwz4n3ykp"))
 ENDPOINT <- Sys.getenv("EXUBER_BUCKET_ENDPOINT", Sys.getenv("AWS_ENDPOINT_URL", "https://t3.storageapi.dev"))
 # Uploads happen only when bucket credentials are in the environment:
@@ -31,7 +32,7 @@ write_crit_bin_xz <- function(n, minw, lag, adf_cv, sadf_cv, gsadf_cv, bsadf_cv,
 
 # One `aws s3 sync` of a local directory to its bucket prefix (only transfers
 # what's new). Returns TRUE on success; never throws, so a network blip
-# doesn't lose local results.
+# doesn't lose local results -- rerun the same aws command by hand (README).
 sync_to_bucket <- function(local_dir, prefix) {
   status <- system2("aws", c(
     "s3", "sync", local_dir, sprintf("s3://%s/%s/", BUCKET, prefix),
