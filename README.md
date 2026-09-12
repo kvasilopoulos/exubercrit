@@ -16,14 +16,19 @@ Deployed at https://exuber.up.railway.app (alias https://exubercrit.kvasilopoulo
 Railway project `exuber`, bucket `exuber-storage`. Bounds enforced by the
 proxy: lag 0–4, n 6–5000.
 
-## Coverage (2026-09-11)
+## Coverage (2026-09-12)
 
-| lag | n         | status                              |
-|-----|-----------|-------------------------------------|
-| 0   | 6–600     | bundled in `exuber::radf_crit`, not in the bucket |
-| 0   | 601–2000  | live                                |
-| 0   | 2001–5000 | not simulated                       |
-| 1–4 | any       | not simulated                       |
+| lag | n         | status |
+|-----|-----------|--------|
+| 0   | 6–4000    | live (n <= 600 is also bundled in `exuber::radf_crit`, which R prefers) |
+| 1   | 7–4000    | live   |
+| 2   | 9–4000    | live   |
+| 3   | 11–4000   | live   |
+| 4   | 15–4000   | live   |
+| any | 4001–5000 | not simulated (proxy allows up to 5000; `Rscript simulate-crit.R 0:4 5000` would do it) |
+
+All tables: 2000 nested paths, seed 123, PSY window `psy_minw(n)`,
+simulated 2026-09-12 with exubercore v0.2.0's `radf_nested()`.
 
 Anything not covered makes `radf()` (without a user-supplied `cv`) error
 with "haven't been simulated yet". n_min(lag) is the smallest n whose PSY window leaves a residual degree of
