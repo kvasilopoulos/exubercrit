@@ -20,7 +20,7 @@ proxy: lag 0–4, n 6–5000.
 
 | lag | n         | status |
 |-----|-----------|--------|
-| 0   | 6–4000    | live (n <= 600 is also bundled in `exuber::radf_crit`, which R prefers) |
+| 0   | 6–4000    | live   |
 | 1   | 7–4000    | live   |
 | 2   | 9–4000    | live   |
 | 3   | 11–4000   | live   |
