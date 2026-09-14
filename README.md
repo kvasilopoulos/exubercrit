@@ -60,6 +60,33 @@ conservative option); `badf_cv` is the PWY asymptotic constants
 (−0.44, −0.08, 0.6). Verified against per-n `rls_gsadf()` on the same seeded
 paths to ~1e-11.
 
+## Validation (2026-09-14)
+
+Three checks, run after exubercore v0.3.1 replaced the v0.2.0 numerics
+(the v0.2.0 SSR formulation could lose precision on series with large
+levels, which zero-mean random walks don't have):
+
+- **Numerics.** 20 of the actual seeded N = 4000 paths recomputed with
+  v0.3.1's `radf_nested()` differ from the v0.2.0 output the tables were
+  built from by at most 3e-11 (lag 0), 2e-8 (lag 2), 2e-6 (lag 4) —
+  orders of magnitude below Monte Carlo noise, so the tables were not
+  re-simulated.
+- **Reduction.** Every stored quantile (`adf`/`sadf`/`gsadf` and the full
+  `bsadf` sequence) equals a per-n `rls_gsadf()` recomputation on the same
+  2000 paths to ≤ 3e-11 (checked at n = 100, 500 lag 0; n = 100 lag 2;
+  n = 300 lag 1).
+- **Statistics.** Against independent `radf_mc_cv(n, nrep = 2000)` runs
+  with fresh seeds (5 per n at n = 20–2000 for lag 0, n = 50–1000 for
+  lag 1; 40 more at n = 100 and 20 at n = 400 to measure the sampling SD
+  of a 2000-replication quantile, ≈ 0.02–0.04 at the 90/95% levels): the
+  90% and 95% tables sit within ±1 SD of the independent mean at every n
+  tested. The 99% column is one heavy-tailed draw (20 exceedances out of
+  2000) shared by every n, and lands on the high side by ~0.1–0.15 for
+  n ≥ 400 (e.g. n = 400 gsadf 99%: 2.867 vs. 2.70 ± 0.03, reached by 1 of
+  25 independent draws). Left as is: 2000 replications is the standard in
+  the literature (PSY 2015 use the same), and the 90/95% columns are what
+  `datestamp()`/`summary()` use by default.
+
 Consequence of (1): the tables are *nested* — every n of a lag shares the
 same 2000 paths, and every lag shares them too (per-replication seeds are
 fixed up front, so output is independent of core count). Each table is
