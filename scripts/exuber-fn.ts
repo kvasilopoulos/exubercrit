@@ -15,8 +15,8 @@ const s3 = new S3Client({
   region: "auto",
 });
 
-// Read-only allowlist: this endpoint can only ever serve these two fixed
-// objects, never an arbitrary bucket key.
+// Read-only allowlist: this endpoint serves only these two fixed objects
+// and never an arbitrary bucket key.
 const CRIT_OBJECTS: Record<string, { key: string; type: string }> = {
   r: { key: "radf_crit2.rds", type: "application/octet-stream" },
   py: { key: "radf_crit2.pkl.xz", type: "application/x-xz" },
@@ -27,15 +27,16 @@ app.get("/api/health", (c) => c.json({ status: "ok" }));
 
 async function serveKey(c: any, key: string, type: string) {
   const file = s3.file(key);
-  // Cheap existence check (HEAD) — avoids streaming a broken response
-  // after headers are already sent.
+  // Cheap existence check (HEAD). It avoids streaming a broken response
+  // after the headers have already been sent.
   if (!(await file.exists())) {
     return c.json({ error: "not found" }, 404);
   }
-  // Stream straight from the bucket to the client; never buffered in
-  // process memory, so cost/RAM don't scale with file size or concurrency.
-  // Must be file.stream(), not the S3File itself: Bun rejects
-  // `new Response(s3File, init)` with ERR_INVALID_ARG_TYPE.
+  // Stream straight from the bucket to the client without buffering in
+  // process memory, so cost and RAM do not grow with file size or
+  // concurrency. This must be file.stream() and not the S3File itself,
+  // because Bun rejects `new Response(s3File, init)` with
+  // ERR_INVALID_ARG_TYPE.
   return new Response(file.stream(), {
     headers: {
       "Content-Type": type,
@@ -50,9 +51,9 @@ app.get("/crit/:lang", async (c) => {
   return serveKey(c, spec.key, spec.type);
 });
 
-// Per-(n, lag) extended table -- one small object per combination, see
-// scripts/simulate-crit.R. Still read-only and
-// bounds-checked: this can only ever address keys under crit/lag*/n*.bin.xz.
+// Per-(n, lag) extended table, one small object per combination (see
+// scripts/simulate-crit.R). This route is also read-only and bounds-checked,
+// and it can address only keys under crit/lag*/n*.bin.xz.
 const N_MIN = 6;
 const N_MAX = 5000;
 const LAG_MAX = 4;

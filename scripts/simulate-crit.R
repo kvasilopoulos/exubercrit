@@ -2,26 +2,29 @@
 # each requested lag, and writes one small file per (lag, n) to OUT_DIR
 # (data/lag<L>/n<N>.bin.xz -- layout in common.R).
 #
-# How it's fast: exubercore::radf_nested() (exuber:::rls_nested) returns the
-# statistics for *every* n in [n_min, N] from a single O(N^2) sweep of one
-# path, because the windows a smaller n uses are prefix windows of the full
-# path. So per lag the cost is 2000 paths of length N -- N = 4000 takes
-# ~0.2 s (lag 0) to ~4 s (lag 4) per path -- instead of a separate O(n^3)
-# simulation per n. Every n of a lag therefore shares the same 2000 paths
-# (nested, still exactly the null distribution at each n; tables are
-# smoother in n than independently simulated ones). The same per-rep seeds
-# are used for every lag, so lags share paths too.
+# Why this is fast: exubercore::radf_nested() (exuber:::rls_nested) returns
+# the statistics for every n in [n_min, N] from a single O(N^2) sweep of one
+# path, because the windows that a smaller n uses are prefix windows of the
+# full path. For each lag the cost is therefore 2000 paths of length N, and
+# N = 4000 takes about 0.2 s (lag 0) to 4 s (lag 4) per path. A separate
+# O(n^3) simulation for each n would take far longer. Every n of a lag shares
+# the same 2000 paths. The tables are nested, and each is still exactly the
+# null distribution at its n. They are smoother in n than independently
+# simulated tables would be. The same per-replication seeds are used for
+# every lag, so the lags share paths too.
 #
-# Reduction matches radf_mc_cv() exactly: adf/sadf/gsadf quantiles across
-# reps; bsadf_cv = per-position quantiles of cummax(badf).
+# The reduction is the same as in radf_mc_cv(): adf, sadf and gsadf are
+# quantiles across replications, and bsadf_cv holds the quantiles of
+# cummax(badf) at each position.
 #
-# n_min per lag is the smallest n whose PSY window leaves >= 1 residual
-# degree of freedom in the first window and >= 2 windows overall (below
-# that radf_mc_cv() itself fails).
+# n_min for each lag is the smallest n whose PSY window leaves at least one
+# residual degree of freedom in the first window and gives at least two
+# windows overall. Below that, radf_mc_cv() itself fails.
 #
-# Flush: once a lag's files are written they are synced to the bucket (if
-# credentials are in the environment -- see common.R), so each lag lands
-# as soon as it's done. Re-running skips lags whose files all exist.
+# Flush: once the files of a lag are written, they are synced to the bucket
+# if credentials are in the environment (see common.R), so each lag is
+# uploaded as soon as it is done. Running the script again skips lags whose
+# files all exist.
 #
 #   Rscript scripts/simulate-crit.R [lags] [N] [nrep] [ncores]
 #   Rscript scripts/simulate-crit.R 0:4 4000        # default
@@ -35,7 +38,7 @@ N      <- if (length(args) >= 2) as.integer(args[2]) else 4000L
 NREP   <- if (length(args) >= 3) as.integer(args[3]) else 2000L
 NCORES <- if (length(args) >= 4) as.integer(args[4]) else max(1L, parallel::detectCores() - 2L)
 SEED   <- 123L
-PKG    <- normalizePath(file.path(SCRIPT_DIR, "..", "..", "exuber"))  # dev tree: rls_nested() isn't on CRAN yet
+PKG    <- normalizePath(file.path(SCRIPT_DIR, "..", "..", "exuber"))  # development tree, because rls_nested() is not on CRAN yet
 LOG    <- file.path(SCRIPT_DIR, "..", ".runs", "simulate-crit.log")
 PCNT   <- c(0.9, 0.95, 0.99)
 
@@ -55,8 +58,8 @@ n_min_for <- function(lag) {
   }
 }
 
-# Per-rep seeds fixed up front so results don't depend on how reps are
-# split across workers (or on NCORES at all).
+# The seed of each replication is fixed up front, so the results do not
+# depend on how replications are split across workers, or on NCORES at all.
 set.seed(SEED)
 seeds <- sample.int(.Machine$integer.max, NREP)
 
@@ -96,8 +99,8 @@ for (lag in LAGS) {
   t0 <- Sys.time()
   for (m in sort(unique(minw))) {
     # bsadf_cv for every n with this window: quantiles of cummax(badf), where
-    # badf for n is W(0, m..R_n) -- identical prefix for all such n, so the
-    # cummax + quantiles are computed once per m and sliced per n.
+    # badf for n is W(0, m..R_n). All such n share the same prefix, so we
+    # compute cummax and the quantiles once for each m and slice them per n.
     cm <- t(apply(w0[, m:R, drop = FALSE], 1, cummax))          # nrep x (R-m+1)
     qm <- t(apply(cm, 2, q))                                     # (R-m+1) x 3
     for (k in which(minw == m)) {

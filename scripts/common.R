@@ -8,11 +8,11 @@ ENDPOINT <- Sys.getenv("EXUBER_BUCKET_ENDPOINT", Sys.getenv("AWS_ENDPOINT_URL", 
 #   eval "$(railway bucket credentials -b exuber-storage)"
 UPLOAD <- nzchar(Sys.getenv("AWS_ACCESS_KEY_ID"))
 
-# Fixed little-endian binary layout, parseable with readBin()/np.frombuffer
-# in R/Python without pickle or RDS overhead. badf_cv is NOT stored: it's
-# always the constant PWY asymptotic tiling (see radf_mc_cv()), trivially
-# reconstructed client-side, so storing it would just double the payload
-# for zero information.
+# Fixed little-endian binary layout, which readBin() in R and np.frombuffer
+# in Python can parse without pickle or RDS overhead. badf_cv is not stored.
+# It is always the constant PWY asymptotic tiling (see radf_mc_cv()), the
+# client rebuilds it easily, and storing it would double the payload without
+# adding information.
 #   int32 x4:  n, minw, lag, nrows
 #   float64 x3: adf_cv (90/95/99%)
 #   float64 x3: sadf_cv
@@ -27,12 +27,13 @@ write_crit_bin_xz <- function(n, minw, lag, adf_cv, sadf_cv, gsadf_cv, bsadf_cv,
   writeBin(as.double(gsadf_cv), con)
   writeBin(as.double(t(bsadf_cv)), con)
   close(con)
-  file.rename(tmp, path)  # atomic-ish: a half-written file never looks "done"
+  file.rename(tmp, path)  # a half-written file never looks finished
 }
 
-# One `aws s3 sync` of a local directory to its bucket prefix (only transfers
-# what's new). Returns TRUE on success; never throws, so a network blip
-# doesn't lose local results -- rerun the same aws command by hand (README).
+# One `aws s3 sync` of a local directory to its bucket prefix, which
+# transfers only what is new. Returns TRUE on success. It never throws, so a
+# network failure does not lose local results. In that case, rerun the same
+# aws command by hand (see the README).
 sync_to_bucket <- function(local_dir, prefix) {
   status <- system2("aws", c(
     "s3", "sync", local_dir, sprintf("s3://%s/%s/", BUCKET, prefix),
